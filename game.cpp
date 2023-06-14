@@ -1,68 +1,63 @@
 #include <unistd.h>
-#include <termios.h>
 #include <iostream>
 
-#include "game.h"
+#include "helpers/helpers.h"
 
-static termios g_oldt;
-static termios g_newt;
-
-Position g_cur_pos;
-
-void drawScreen(int field[4][4])
+Game::Game()
 {
-    printf("\033[H\033[J");
-    for (int x = 0; x < 9; ++x)
-    {
-        if (x % 2 == 0)
-        {
-            printf("-------------\n");
-        }
-        else
-        {
-            for (int y = 0; y < 4; ++y)
-            {
-                if (field[x/2][y] == 0)
-                {
-                    printf("|  ");
-                }
-                else
-                {
-                    printf("|%.2d", field[x/2][y]);
-                }
-            }
-            printf("|\n");
-        }
-    }
 }
 
-void init(int field[4][4])
+Game::~Game()
 {
-    tcgetattr(STDIN_FILENO, &g_oldt);
-    g_newt = g_oldt;
-    g_newt.c_lflag &= ~(ICANON | ECHO);
-    tcsetattr(STDIN_FILENO, TCSANOW, &g_newt);
+}
 
-    int i = 0;
-    for (int x = 0; x < 4; ++x)
+void Game::init(uint16_t rows, uint16_t columns)
+{
+    if (rows < 2 || columns < 2)
     {
-        for (int y = 0; y < 4; ++y)
+        std::cerr << "Bad field params" << std::endl;
+        return;
+    }
+
+    _fieldSize.x = rows;
+    _fieldSize.y = columns;
+
+    _field = new uint16_t*[rows];
+    for (int i = 0; i < rows; ++i)
+    {
+        _field[i] = new uint16_t[columns];
+    }
+
+    uint16_t i = 0;
+    for (uint16_t x = 0; x < rows; ++x)
+    {
+        for (uint16_t y = 0; y < columns; ++y)
         {
-            field[x][y] = i++;
+            setCell(x, y, ++i);
         }
     }
 
-    g_cur_pos.x = 0;
-    g_cur_pos.y = 0;
+    _curPos.x = rows - 1;
+    _curPos.y = columns - 1;
 
+    setCell(_curPos.x, _curPos.y, 0);
+
+    _drawer = new DrawerSimple(this);
 }
 
-void close()
+void Game::close()
 {
-    tcsetattr(STDIN_FILENO, TCSANOW, &g_oldt);
+    for (int i = 0; i < _fieldSize.x; ++i)
+    {
+        delete[] _field[i];
+    }
+
+    delete[] _field;
+
+    delete _drawer;
 }
 
-GameState getState()
+GameState Game::getState()
 {
     int inter_state = 0;
     int key;
@@ -115,50 +110,65 @@ GameState getState()
                     break;
             }
         }
-        // printf("%d state:%d\n", key, inter_state);
     }
     while (true);
 
     return GameState::UNKNOWN;
 }
 
-void doAction(int field[4][4], GameState state)
+
+uint16_t Game::getCellValue(uint16_t row, uint16_t column)
+{
+    return _field[row][column];
+}
+
+void Game::setCell(uint16_t row, uint16_t column, uint16_t value)
+{
+    _field[row][column] = value;
+}
+
+void Game::doAction(GameState state)
 {
     switch (state)
     {
     case GameState::MOVE_LEFT:
-        if (g_cur_pos.y > 0)
+        if (_curPos.y > 0)
         {
-            field[g_cur_pos.x][g_cur_pos.y] = field[g_cur_pos.x][g_cur_pos.y - 1];
-            field[g_cur_pos.x][g_cur_pos.y - 1] = 0;
-            --g_cur_pos.y;
+            setCell(_curPos.x, _curPos.y, getCellValue(_curPos.x, _curPos.y - 1));
+            setCell(_curPos.x, _curPos.y - 1, 0);
+            --_curPos.y;
         }
         break;
     case GameState::MOVE_RIGHT:
-        if (g_cur_pos.y < 3)
+        if (_curPos.y < _fieldSize.y - 1)
         {
-            field[g_cur_pos.x][g_cur_pos.y] = field[g_cur_pos.x][g_cur_pos.y + 1];
-            field[g_cur_pos.x][g_cur_pos.y + 1] = 0;
-            ++g_cur_pos.y;
+            _field[_curPos.x][_curPos.y] = _field[_curPos.x][_curPos.y + 1];
+            _field[_curPos.x][_curPos.y + 1] = 0;
+            ++_curPos.y;
         }
         break;
     case GameState::MOVE_DOWN:
-        if (g_cur_pos.x < 3)
+        if (_curPos.x < _fieldSize.x - 1)
         {
-            field[g_cur_pos.x][g_cur_pos.y] = field[g_cur_pos.x + 1][g_cur_pos.y];
-            field[g_cur_pos.x + 1][g_cur_pos.y] = 0;
-            ++g_cur_pos.x;
+            _field[_curPos.x][_curPos.y] = _field[_curPos.x + 1][_curPos.y];
+            _field[_curPos.x + 1][_curPos.y] = 0;
+            ++_curPos.x;
         }
         break;
     case GameState::MOVE_UP:
-        if (g_cur_pos.x > 0)
+        if (_curPos.x > 0)
         {
-            field[g_cur_pos.x][g_cur_pos.y] = field[g_cur_pos.x - 1][g_cur_pos.y];
-            field[g_cur_pos.x - 1][g_cur_pos.y] = 0;
-            --g_cur_pos.x;
+            _field[_curPos.x][_curPos.y] = _field[_curPos.x - 1][_curPos.y];
+            _field[_curPos.x - 1][_curPos.y] = 0;
+            --_curPos.x;
         }
         break;
     default:
         break;
     }
+}
+
+void Game::refresh()
+{
+    _drawer->drawScreen(this);
 }

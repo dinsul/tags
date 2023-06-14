@@ -1,3 +1,5 @@
+#include <inttypes.h>
+
 enum class GameState
 {
     UNKNOWN,
@@ -10,34 +12,40 @@ enum class GameState
 
 struct Position
 {
-    int x;
-    int y;
+    uint16_t x;
+    uint16_t y;
 };
 
-//class DrawHelper
-//{
-//public:
-    //virtual void init() = 0;
-    //virtual void drawScreen() = 0;
-//};
-//
-//
-//class Game
-//{
-    //int **_field;
-    //Position _curPos;
-    //DrawHelper _drawer;
-//
-//public:
-    //void init();
-    //void close();
-    //GameState getState();
-    //void doAction(GameState state);
-//};
+class Game;
 
+class DrawHelper
+{
+public:
+    virtual ~DrawHelper() {};
+    virtual void drawScreen(Game *game) = 0;
+};
 
-void drawScreen(int field[4][4]);
-void init(int field[4][4]);
-void close();
-GameState getState();
-void doAction(int field[4][4], GameState state);
+class Game
+{
+    uint16_t **_field;
+    Position _fieldSize;
+
+    Position _curPos;
+    DrawHelper* _drawer;
+
+public:
+    Game();
+    ~Game();
+
+    void init(uint16_t rows, uint16_t columns);
+    void close();
+    GameState getState();
+    uint16_t getRows()    { return _fieldSize.x; };
+    uint16_t getColumns() { return _fieldSize.y; };
+    uint16_t getCellValue(uint16_t row, uint16_t column);
+
+    void setCell(uint16_t row, uint16_t column, uint16_t value);
+
+    void doAction(GameState state);
+    void refresh();
+};

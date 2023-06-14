@@ -2,20 +2,20 @@
 
 int main()
 {
-    int field[4][4];
+    Game game;
+    game.init(4, 4);
 
-    init(field);
     GameState cur_state;
 
     do
     {
-        drawScreen(field);
-        cur_state = getState();
-        doAction(field, cur_state);
+        game.refresh();
+        cur_state = game.getState();
+        game.doAction(cur_state);
     }
     while(cur_state != GameState::EXIT);
 
-    close();
+    game.close();
 
     return 0;
 }
